@@ -35,7 +35,7 @@ app.post("/register",async(req,res)=>{
                 })
                 let token=jwt.sign({email:email, userid:theUser._id},"secret key")
                 res.cookie("token",token);
-                res.render("profile")
+                res.render("profile",{currentUser:theUser})
             });
         });
 
@@ -55,7 +55,7 @@ app.post("/login",async (req,res)=>{
             if(result){
                 let token=jwt.sign({email:email,userid:theUser._id },"secret key")
                 res.cookie("token",token);
-                res.render("profile")
+                res.render("profile",{currentUser:theUser})
                 
             }
         });
@@ -69,8 +69,11 @@ app.get("/logout",(req,res)=>{
 })
 
 app.get("/profile",isLoggedIn,async (req,res)=>{
-    let currentUser= await user.findOne({email:req.asliUser.email})
-    res.render("profile",{currentUser})
+    const theUser= await user.findOne({email:req.asliUser.email}).populate("posts")
+    // the populate function actually, brings the whole object of the
+    //  corresponding post _id
+   
+    res.render("profile",{currentUser:theUser})
 })
 
 
@@ -80,11 +83,25 @@ function isLoggedIn(req,res,next){
     else{
         let data=jwt.verify(req.cookies.token,"secret key");
         req.asliUser=data;  // we are appending an object to req object
-        // console.log("kaise ho bhaiya ?")
+        // console.log(req.asliUser)
         next();
     }
    
 }
+
+app.post("/post",isLoggedIn,async (req,res)=>{
+    let{content}=req.body;
+    let theUser=await user.findOne({email:req.asliUser.email});
+
+    let createdPost=await post.create({
+        user:theUser._id,
+        content:content
+    })
+
+    theUser.posts.push(createdPost._id);
+    await theUser.save(); // need to do this cause we are manually changing data of a model
+    res.redirect("/profile")
+})
 
 app.listen(3000,()=>{
     console.log("server started on port 3000")
